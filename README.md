@@ -35,7 +35,7 @@ TBD
 * see [LIBRARIES](https://github.com/username/sw-name/blob/master/LIBRARIES.md) files
 
 ## License 
-* see [LICENSE](https://github.com/username/sw-name/blob/master/LICENSE.md) file
+* see [LICENSE](https://github.com/KevinTyrrell/Rank14LosSA-Classic/blob/master/LICENSE.md) file
 
 ## Version 
 * Version X.Y.Z
