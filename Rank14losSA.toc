@@ -1,7 +1,10 @@
 ## Interface: 11302
-## Title: Rank14losSA
+# Coloring Format: |cAARRGGBB (|c denotes color, Alpha,Red,Green,Blue)
+## Title: |cFFB157FFRank14LosSA|cFFFFD857-Classic
+## Author: KevinTyrrell (Ported from Nogall of Feenix Warsong)
 ## Notes: Backport of GladiatorlosSA
-## Author: Nogall of feenix Warsong
-## SavedVariables: RSAConfig
+## Version: 2.0.0
+## DefaultState: enabled
+## SavedVariablesPerCharacter:
 
 RSA.xml
