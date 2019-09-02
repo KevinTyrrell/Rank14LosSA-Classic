@@ -7,4 +7,9 @@
 ## DefaultState: enabled
 ## SavedVariablesPerCharacter:
 
-RSA.xml
+# Setup for the AddOn namespace.
+src/Core.lua
+# Spell database.
+src/Spells.lua
+# Rank14LosSA module.
+src/RSA.lua
