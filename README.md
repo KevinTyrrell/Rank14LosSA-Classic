@@ -10,7 +10,7 @@ Rank14LosSA-Classic
 ## Download
 [comment]: <> (* [Version X.Y.Z] (https://github.com/username/sw-name/archive/master.zip )
 [comment]: <> (* Other versions)
-TBD
+* TBD
 
 ## Usage
 * Download the **release** version (not clone repository) [above](#download).
@@ -29,19 +29,13 @@ Any of the following commands are acceptable
 * Nogall (Feenix-Warsong) - Original Author of Rank14LosSA-Classic
 
 ### Translations
-TBD
-
-### Third party libraries
-* see [LIBRARIES](https://github.com/username/sw-name/blob/master/LIBRARIES.md) files
+* TBD
 
 ## License 
 * see [LICENSE](https://github.com/KevinTyrrell/Rank14LosSA-Classic/blob/master/LICENSE.md) file
 
 ## Version 
-* Version X.Y.Z
-
-## How-to use this code
-* see [INSTRUCTIONS](https://github.com/username/sw-name/blob/master/INSTRUCTIONS.md) file
+* Version 2.0.0
 
 ## Contact
 #### Kevin Tyrrell

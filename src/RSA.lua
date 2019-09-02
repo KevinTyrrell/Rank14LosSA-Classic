@@ -44,6 +44,10 @@ RSA_VERSION = (function()
     return setmetatable(version, { __tostring = tostring, __call = tostring, __metatable = true })
 end)()
 
+--[[ Addon Name -- Must match folder name. ]]--
+ADDON_NAME = "Rank14LosSA-Classic"
+ADDON_NAME_SHORT = "RSA"
+
 --[[ Data types of Lua, organized into a table in an enum format. ]]--
 DATA_TYPES = {
     NIL = "nil", BOOLEAN = "boolean", NUMBER = "number",
@@ -81,7 +85,7 @@ end)()
 ]]--
 _G.RSA_print = function(var)
     -- RSAMenuFrame_Toggle()
-    DEFAULT_CHAT_FRAME:AddMessage("RSA: " .. tostring(var), 1.0, 0.6, 0.2, 53, 10);
+    DEFAULT_CHAT_FRAME:AddMessage(ADDON_NAME_SHORT .. ": " .. tostring(var), 1.0, 0.6, 0.2, 53, 10);
 end
 print = RSA_print
 
@@ -155,7 +159,7 @@ end)()
 -- @see PlaySoundFile
 ]]--
 local function play_sound(spell_name)
-	PlaySoundFile("Interface\\AddOns\\Rank14losSA\\Voice\\" .. spell_name .. ".ogg", "SFX")
+	PlaySoundFile("Interface\\AddOns\\" .. ADDON_NAME .. "\\Voice\\" .. spell_name .. ".ogg", "SFX")
 end
 
 --[[
@@ -171,7 +175,7 @@ local function aura_exists(unit, aura_name)
     return false
 end
 
--- Keeps track of players who stealthed < a second ago.
+-- Keeps track of players who recently went into stealth.
 local recently_stealthed = { }
 --[[
 -- Callback function.
@@ -225,8 +229,19 @@ local wait = (function()
     end
 end)()
 
---[[ List of demons in which a warlock can summon. ]]--
+--[[ List of demon summoning spells in which a warlock can cast. ]]--
 local WARLOCK_SUMMONS = { "Summon Voidwalker", "Summon Imp", "Summon Succubus", "Summon Felhunter", "Inferno" }
+
+--[[
+-- @return true if the client player is in a battleground.
+-- @see GetRealZoneText
+]]--
+local is_in_battleground = (function()
+	local bgs = { "Alterac Valley", "Arathi Basin", "Warsong Gulch" }
+	return function()
+		return bgs[GetRealZoneText()] ~= nil
+	end
+end)()
 
 --[[
 -- Defined in RSA.xml
@@ -543,35 +558,6 @@ function RSA_UpdateState()
 		RSA_Enable()
 	else
 		RSA_Disable()
-	end
-end
-
-
-function RSA_FilterFadingBuffs(msg)
-	if not RSAConfig.fadingBuffs.enabled then return end
-	local t = stringToTable(msg)
-	local spell = t[1]
-	local i = 2
-	while i < table.getn(t) - 2 do
-		spell = spell..t[i]
-		i = i + 1
-	end
-	if RSAConfig.fadingBuffs[spell] then
-		RSA_PlaySoundFile(spell.."down")
-	end
-end
-
-function RSA_Subtable(index)
-	if index < RSA_BUFF then
-		return "buffs"
-	elseif index < RSA_CAST then
-		return "casts"
-	elseif index < RSA_DEBUFF then
-		return "debuffs"
-	elseif index < RSA_FADING then
-		return "fadingBuffs"
-	else
-		return "use"
 	end
 end
 
