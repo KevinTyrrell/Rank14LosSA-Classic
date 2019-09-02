@@ -102,8 +102,8 @@ function _G.SlashCmdList.RSA(msg, editBox)
 end
 
 -- Blizzard API requirement for naming convention.
-_G.SLASH_RSA1, _G.SLASH_RSA2, _G.SLASH_RSA3, _G.SLASH_RSA4, _G.SLASH_RSA5, _G.SLASH_RSA6, _G.SLASH_RSA7, _G.SLASH_RSA8
-    = "/rsa", "/rank14", "/r14", "/r14lossa", "/rank14lossa", "/lossa", "/sa", "/soundalerter"
+_G.SLASH_RSA1, _G.SLASH_RSA2, _G.SLASH_RSA3, _G.SLASH_RSA4, _G.SLASH_RSA5, _G.SLASH_RSA6, _G.SLASH_RSA7, _G.SLASH_RSA8, _G.SLASH_RSA9, _G.SLASH_RSA10
+    = "/rsa", "/rank14", "/r14", "/r14lossa", "/rank14lossa", "/lossa", "/sa", "/soundalerter", "/gsa", "/gladiatorlossa"
 
 --[[
 -- @return true if the flag represents a hostile player.
