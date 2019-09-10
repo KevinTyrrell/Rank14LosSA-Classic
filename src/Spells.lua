@@ -86,15 +86,23 @@ local spell_entry = (function()
     end
 end)()
 
+--[[
+-- Queries to see if the specified spell should be alerted.
+--
+-- @param event string Event name from the WoW API (ex. "SPELL_AURA_APPLIED")
+-- @param source number Bitfield flags from the WoW API for the source of the spell.
+-- @param target number Bitfield flags from the WoW API for the target of the spell.
+]]--
 function sound_query(event, spell_name, source, target)
     local spells_for_event = spell_database[event]
     if spells_for_event == nil then return end
     local spells_for_name = spells_for_event[spell_name]
     if spells_for_name == nil then return end
     
-    for _, v in pairs(spells_for_name) do
-        play_sound(v.sound)
-        return
+    for _, spell_table in pairs(spells_for_name) do
+        local src, tar = spell_table.source, spell_table.target
+        if (src == nil or src == source) and (tar == nil or tar == target) then
+            play_sound(spell_table.sound) return end
     end
 end
 

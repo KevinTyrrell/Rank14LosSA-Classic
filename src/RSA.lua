@@ -71,7 +71,7 @@ end)()
 -- @return true if the flag represents the client player.
 -- @see CombatLogGetCurrentEventInfo
 ]]--
-local is_client_player = (function()
+local is_client_player = (function()  
     local band = bit.band
     return function(flag)
         return band(flag, COMBATLOG_OBJECT_AFFILIATION_MASK) == COMBATLOG_OBJECT_AFFILIATION_MINE
@@ -89,34 +89,8 @@ function play_sound(spell_name)
 end
 
 --[[
--- Determines if an aura exists on a specified unit.
--- @return true if the specified aura exists on the unit.
-]]--
-local function aura_exists(unit, aura_name)
-    for i = 1, 16 do -- Classic will have 16 buff slots.
-        name = UnitAura(unit, i)
-        if name == nil then return false end
-        if name == aura_name then return true end
-    end
-    return false
-end
-
--- Keeps track of players who recently went into stealth.
-local recently_stealthed = { }
---[[
--- Callback function.
--- Used to protect vanishing players from wrongly reporting 'stealth'.
-]]--
-local function vanish_check(player_name)
-    print("Checking vanish.")
-    if recently_stealthed[player_name] then
-        recently_stealthed[player_name] = nil
-        play_sound("Stealth")
-    end
-end
-
---[[
 -- Waits a specified amount of time, then calls a callback function.
+--
 -- @param delay Amount of time to wait in seconds (ex. 0.5 for half-second)
 -- @param func Callback function to be called after the delay.
 -- @param ... Arguments to be passed to the callback function.
@@ -154,9 +128,6 @@ local wait = (function()
         return true;
     end
 end)()
-
---[[ List of demon summoning spells in which a warlock can cast. ]]--
-local WARLOCK_SUMMONS = { "Summon Voidwalker", "Summon Imp", "Summon Succubus", "Summon Felhunter", "Inferno" }
 
 --[[
 -- @return true if the client player is in a battleground.
