@@ -5,7 +5,7 @@
 ## Notes: Backport of GladiatorlosSA
 ## Version: 2.0.0
 ## DefaultState: enabled
-## SavedVariablesPerCharacter:
+## SavedVariables: RSA_Preferences
 
 # Setup for the AddOn namespace.
 src/Core.lua

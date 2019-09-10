@@ -18,110 +18,36 @@
 --    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]--
 
---[[
--- Store access to the global table.
--- Scope global variables out of the global table.
--- Identifiers not found here are redirected to _G.
-]]--
-local _G = getfenv(0)
-setfenv(1, setmetatable({ }, { __index = _G, __metatable = true }))
+--[[ AddOn Namespace ]]--
+local addOnName, R14LosSA = ...
+setfenv(1, R14LosSA)
 
---[[
--- Semantic Versioning
--- Ex. https://datasift.github.io/gitflow/Versioning.html
--- Increment Z when you fix something
--- Increment Y when you add a new feature
--- Increment X when you break backwards-compatibility or add major features
---]]
-RSA_VERSION = (function()
-    local version = { }
-    version.X, version.Y, version.Z = 2, 0, 0
-    
-    local tostring = (function()
-        local str = tostring(version.X) .. "." .. tostring(version.Y) .. "." .. tostring(version.Z)
-        return function() return str end
-    end)()
-    return setmetatable(version, { __tostring = tostring, __call = tostring, __metatable = true })
-end)()
+--[[ Cached strings, placing them into a table would defeat the purpose. ]]--
+local PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD"
+local COMBAT_LOG_EVENT_UNFILTERED = "COMBAT_LOG_EVENT_UNFILTERED"
 
---[[ Addon Name -- Must match folder name. ]]--
-ADDON_NAME = "Rank14LosSA-Classic"
-ADDON_NAME_SHORT = "RSA"
-
---[[ Data types of Lua, organized into a table in an enum format. ]]--
-DATA_TYPES = {
-    NIL = "nil", BOOLEAN = "boolean", NUMBER = "number",
-    STRING = "string", USERDATA = "userdata",
-    FUNCTION = "function", THREAD = "thread", TABLE = "table"
-}
-
---[[
--- Parses a specified value into a string.
--- @param x Value to be parsed.
--- @return string representation of the specified value.
-]]--
-tostring = (function()
-    local tostring, type, pairs = tostring, type, pairs
-    local function t(obj)
-        if type(obj) == DATA_TYPES.TABLE then
-            local table_str = "{"
-            local flag = false
-            for k, v in pairs(obj) do
-                table_str = table_str .. (flag and ", " or  " ") .. "[" .. t(k) .. "]=" .. t(v)
-                flag = true
-            end
-            return table_str .. " }"
-        end
-        return tostring(obj)
-    end
-    return t
-end)()
-
---[[
--- Prints a message to the user's chat frame.
--- This should be used primarily for debugging purposes.
--- @param var Variable to be printed.
--- @see tostring
-]]--
-_G.RSA_print = function(var)
-    -- RSAMenuFrame_Toggle()
-    DEFAULT_CHAT_FRAME:AddMessage(ADDON_NAME_SHORT .. ": " .. tostring(var), 1.0, 0.6, 0.2, 53, 10);
-end
-print = RSA_print
-
---[[
--- Provides a greetings to players who are logging in.
--- This can be disabled by toggling the 'greetings' config setting.
-]]--
-local function greetings()
-    print("Rank14LosSA ported by KevinTyrrell - Version " .. RSAConfig.version())
-end
+--[[ Frame used to hook into events. ]]--
+local frame = CreateFrame("Frame")
+--[[ Begin listening to the following events: ]]--
+frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 --[[
 -- Disables sound files from being played.
 ]]--
 function sound_disable()
-    RSAMenuFrame:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    frame:UnregisterEvent(COMBAT_LOG_EVENT_UNFILTERED)
 end
 
 --[[
 -- Enables the playing of sound files.
 ]]--
 function sound_enable()
-    RSAMenuFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-end
-
---[[
--- Defined in RSA.xml
--- Script which is called when the addon is loaded.
-]]--
-function _G.RSA_OnLoad()
-    RSAMenuFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-    sound_enable()
+    frame:RegisterEvent(COMBAT_LOG_EVENT_UNFILTERED)
 end
 
 -- Blizzard API requirement for setting up /slash commands.
 function _G.SlashCmdList.RSA(msg, editBox)
+    msg = trim(msg)
     DEFAULT_CHAT_FRAME:AddMessage("RSA: To be completed.", 1.0, 0.6, 0.2, 53, 10);
 end
 
@@ -158,8 +84,8 @@ end)()
 -- "Master" parameter will play sounds even while game sound is muted.
 -- @see PlaySoundFile
 ]]--
-local function play_sound(spell_name)
-	PlaySoundFile("Interface\\AddOns\\" .. ADDON_NAME .. "\\Voice\\" .. spell_name .. ".ogg", "SFX")
+function play_sound(spell_name)
+	PlaySoundFile("Interface\\AddOns\\" .. addOnName .. "\\res\\Voice\\" .. spell_name .. ".ogg", "SFX")
 end
 
 --[[
@@ -244,185 +170,25 @@ local is_in_battleground = (function()
 end)()
 
 --[[
--- Defined in RSA.xml
+-- Called when the addon is loaded.
+]]--
+local function load()
+    -- No need to view this event anymore.
+    frame:UnregisterEvent(PLAYER_ENTERING_WORLD)
+    greetings()
+    sound_enable()
+end
+
+--[[
 -- Script called when an in-game event occurs.
 ]]--
-function _G.RSA_OnEvent(event, ...)
-	if event == "PLAYER_ENTERING_WORLD" then
-        -- No more need to listen to the entering world event.
-		RSAMenuFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
-		if not RSAConfig or not RSAConfig.version or RSAConfig.version ~= version then
-			-- This is written poorly but I'm too lazy to fix it.
-            RSAConfig = {
-				["enabled"] = true,
-                ["greetings"] = true,
-				["outside"] = true,
-				["version"] = RSA_VERSION,
-				["buffs"] = {
-					["AdrenalineRush"] = true, -- untested
-					["ArcanePower"] = true, -- untested
-					["Barkskin"] = true, -- untested
-					["BattleStance"] = true,
-					["BerserkerRage"] = true, -- untested
-					["BerserkerStance"] = false, -- untested
-					["BestialWrath"] = true, -- untested
-					["BladeFlurry"] = true, -- untested
-					["BlessingofFreedom"] = true, -- untested
-					["BlessingofProtection"] = true, -- untested
-					["Cannibalize"] = true, -- untested
-					["ColdBlood"] = true, -- untested
-					["Combustion"] = true, -- untested
-					["Dash"] = true,
-					["DeathWish"] = true, -- untested
-					["DefensiveStance"] = false,
-					["DesperatePrayer"] = true, -- untested
-					["Deterrence"] = true, -- untested
-					["DivineFavor"] = true, -- untested
-					["DivineShield"] = true, -- untested
-					["EarthbindTotem"] = true, -- untested
-					["ElementalMastery"] = true, -- untested
-					["Evasion"] = true, -- untested
-					["Evocation"] = true, -- untested
-					["FearWard"] = true, -- untested
-                    ["FelDomination"] = true, -- untested
-					["FirstAid"] = true, -- untested
-					["FrenziedRegeneration"] = true, -- untested
-					["FreezingTrap"] = true, -- untested
-					["GroundingTotem"] = true, -- untested
-					["IceBlock"] = true, -- untested
-					["InnerFocus"] = true, -- untested
-					["Innervate"] = true, -- untested
-					["Intimidation"] = true, -- untested
-					["LastStand"] = true, -- untested
-					["ManaTideTotem"] = true, -- untested
-					["Nature'sGrasp"] = true, -- untested
-					["Nature'sSwiftness"] = true, -- untested
-					["PowerInfusion"] = true, -- untested
-					["PresenceofMind"] = true, -- untested
-                    ["Prowl"] = true, -- special case
-					["RapidFire"] = true, -- untesteds
-					["Recklessness"] = true, -- untested
-					["Reflector"]= true, -- untested
-					["Retaliation"] = true, -- untested
-					["Sacrifice"] = true, -- untested
-					["ShieldWall"] = true, -- untested
-					["Sprint"] = true,
-                    ["Stealth"] = true,
-					["Stoneform"] = true, -- untested
-					["SweepingStrikes"] = true, -- untested
-					["Tranquility"] = true, -- untested
-					["TremorTotem"] = true, -- untested
-					["Trinket"] = true, -- untested
-                    ["Vanish"] = true,
-					["WilloftheForsaken"] = true,
-				},
-				["casts"] = {
-                    ["AimedShot"] = true, -- untested
-					["EntanglingRoots"] = true, -- untested
-					["EscapeArtist"] = true, -- untested
-					["Fear"] = true, -- untested
-					["Hearthstone"] = true,
-					["Hibernate"] = true, -- untested
-					["HowlofTerror"] = true, -- untested
-					["MindControl"] = true, -- untested
-					["Polymorph"] = true, -- untested
-					["RevivePet"] = true, -- untested
-					["ScareBeast"] = true, -- untested
-					["WarStomp"] = true,
-                    ["SummonDemon"] = true, -- special case -- untested
-				},
-				["debuffs"] = {
-					["Blind"] = true, -- untested
-					["ConcussionBlow"] = true, -- untested
-					["Counterspell-Silenced"] = true, -- untested
-					["DeathCoil"] = true, -- untested
-					["Disarm"] = true, -- untested
-					["HammerofJustice"] = true, -- untested
-					["IntimidatingShout"] = true, -- untested
-					["PsychicScream"] = true, -- untested
-					["Repetance"] = true, -- untested
-					["ScatterShot"] = true, -- untested
-					["Seduction"] = true, -- untested
-					["Silence"] = true, -- untested
-					["SpellLock"] = true, -- untested
-					["WyvernSting"] = true, -- untested
-				},
-				["fadingBuffs"] = {
-					["BlessingofProtection"] = true, -- untested
-					["Deterrence"] = true, -- untested
-					["DivineShield"] = true, -- untested
-					["Evasion"] = true, -- untested
-					["IceBlock"] = true, -- untested
-					["ShieldWall"] = true, -- untested
-				},
-				["use"] = {
-					["Kick"] = true,
-                    ["ShieldBash"] = true, -- untested
-                    ["Pummel"] = true, -- untested
-				},
-			}
-		end
-        greetings()
-		if RSAConfig.enabled then
-			if not RSAConfig.outside then
-				RSAMenuFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-				RSA_UpdateState()
-			else
-				sound_enable()
-			end
-		end
+frame:SetScript("OnEvent", function(userdata, event, ...)
+	if event == PLAYER_ENTERING_WORLD then
+        load()
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
-        local _, sub_event, _, _, source_name , source_flags, _, _, dest_name, dest_flags, _, _, spell_name = CombatLogGetCurrentEventInfo()
-        print({ CombatLogGetCurrentEventInfo() })
-        -- Ensure the combat log event came from a hostile player.
-        if true or is_hostile_player(source_flags) then
-            -- Non-instant cast spells such as Fear.
-            if sub_event == "SPELL_CAST_START" then
-                -- Casts without targets leaves 'dest_name' nil.
-                if dest_name == nil or is_client_player(dest_flags) then
-                    -- Warlock spell names can vary, special check.
-                    if WARLOCK_SUMMONS[spell_name] then
-                        play_sound("SummonDemon") return end
-                    spell_name = gsub(spell_name, "%s+", "")
-                    if RSAConfig.casts[spell_name] then
-                        play_sound(spell_name) end
-                end
-            -- Buffing and debuffing abilities.
-            elseif sub_event == "SPELL_AURA_APPLIED" then
-                if is_client_player(dest_flags) then
-                    spell_name = gsub(spell_name, "%s+", "")
-                    if RSAConfig.debuffs[spell_name] then
-                        play_sound(spell_name) end
-                -- Enemy casted buff on himself.
-                elseif source_name == dest_name then
-                    --[[ Vanish automatically places the player into stealth.
-                    -- This means Rank14losSA will send alerts for both vanish and stealth.
-                    -- Stagger the 'Stealth' alert by one second to prevent false positives. ]]--
-                    if spell_name == "Stealth" then 
-                        recently_stealthed[dest_name] = true
-                        wait(1, vanish_check, dest_name)
-                    elseif spell_name == "Prowl" then
-                        play_sound("Stealth") -- Special Case
-                    else
-                        spell_name = gsub(spell_name, "%s+", "")
-                        if RSAConfig.buffs[spell_name] then
-                            play_sound(spell_name) end
-                    end
-                end
-            -- Instant cast spells which do not fit into the other events.
-            elseif sub_event == "SPELL_CAST_SUCCESS" then
-                if spell_name == "Vanish" then
-                    -- Player vanished, do NOT send an alert for 'Stealth' as well.
-                    recently_stealthed[source_name] = nil
-                    play_sound(spell_name)
-                elseif is_client_player(dest_flags) then
-                    spell_name = gsub(spell_name, "%s+", "")
-                    if RSAConfig.use[spell_name] then
-                        play_sound(spell_name) end
-                end
-            end
-        end
+        local _, sub_event, _, _, _, source_flags, _, _, _, target_flags, _, _, spell_name = CombatLogGetCurrentEventInfo()
+        sound_query(sub_event, spell_name, source_flags, target_flags)
     elseif event == "ZONE_CHANGED_NEW_AREA" then
-        RSA_UpdateState()
+		print("A")
     end
-end
+end)
