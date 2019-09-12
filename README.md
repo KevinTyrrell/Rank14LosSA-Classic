@@ -26,7 +26,7 @@ Any of the following commands are acceptable
 
 ## Contributors
 * [superk589](https://www.curseforge.com/members/superk589/projects) - Original Author of [GladiatorLosSA](https://www.curseforge.com/wow/addons/GladiatorlosSA)
-* Nogall (Feenix-Warsong) - Original Author of Rank14LosSA-Classic
+* Nogall (Feenix-Warsong) - Original Author of GladiatorLosSA's 1.12.1 port: Rank14LosSA
 
 ### Translations
 * TBD

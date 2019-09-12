@@ -45,20 +45,6 @@ function create_named_obj(name, obj)
     return setmetatable(obj, { __tostring = tostring, __call = tostring, __metatable = true })
 end
 
-
---[[
--- Semantic Versioning
--- Ex. https://datasift.github.io/gitflow/Versioning.html
--- Increment Z when you fix something
--- Increment Y when you add a new feature
--- Increment X when you break backwards-compatibility or add major features
---]]
-RSA_VERSION = (function()
-    local X, Y, Z = 2, 0, 0
-    local version = tostring(X) .. "." .. tostring(Y) .. "." .. tostring(Z)
-    return create_named_obj(version)
-end)()
-
 --[[
 -- Parses a specified value into a string.
 -- @param x Value to be parsed.
