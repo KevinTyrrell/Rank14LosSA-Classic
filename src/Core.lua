@@ -1,6 +1,6 @@
 --[[
--- Rank14LosSA-Classic - Port of the popular vanilla addon 'Rank14LosSA'
--- (originally GladiatorlosSA) to World of Warcraft: Classic
+-- Rank14LosSA-Classic - World of Warcraft: Classic AddOn used to
+---- auditorily notify you of important spells used around you.
 --
 --    Copyright (C) 2019 Kevin Tyrrell
 --
