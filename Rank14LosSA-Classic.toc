@@ -1,8 +1,7 @@
 ## Interface: 11302
-# Coloring Format: |cAARRGGBB (|c denotes color, Alpha,Red,Green,Blue)
 ## Title: |cFFB157FFRank14LosSA|cFFFFD857-Classic
 ## Author: KevinTyrrell (Ported from Nogall of Feenix Warsong)
-## Notes: Backport of GladiatorlosSA
+## Notes: Rank14LosSA-Classic is a World of Warcraft: Classic addon used to auditorily notify you of important spells used around you.
 ## Version: 2.0.0
 ## DefaultState: enabled
 ## SavedVariables: RSA_Preferences

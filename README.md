@@ -1,42 +1,75 @@
 Rank14LosSA-Classic
 ======
-**Rank14LosSA-Classic** is a World of Warcraft: Classic addon used to auditorily warn you of important spells or actions used by enemy players. This addon is a complete rewrite of Nogall's (Feenix-Warsong) Rank14LosSA, which itself was a backport of GladiatorlosSA. 
+**Rank14LosSA-Classic** is a World of Warcraft: Classic AddOn used to auditorily notify you of important spells used around you. This addon is a complete rewrite of *Nogall's (Feenix-Warsong)* **_Rank14LosSA_**, which itself was a backport of **_GladiatorlosSA_**.
+<p align="center">
+  <img src="https://github.com/KevinTyrrell/Rank14LosSA-Classic/blob/master/res/Images/Thumbnail.png?raw=true" alt="Rank14LosSA Thumbnail"/>
+</p>
 
-#### Screenshot
-[comment]: <> (To Be Completed)
+- [SCREENSHOT](#screenshot)
+- [DOWNLOAD](#download)
+- [USAGE](#usage)
+- [VERSION](#version)
+- [LICENSE](#license)
+- [CONTACT](#contact)
 
-![TBD](http://url/screenshot-software.png "screenshot software")
+# SCREENSHOT
 
-## Download
-[comment]: <> (* [Version X.Y.Z] (https://github.com/username/sw-name/archive/master.zip )
-[comment]: <> (* Other versions)
-* TBD
+![Rank14LosSA Screenshot](res/Images/v2.0.0.png?raw=true "Rank14LosSA Screenshot")
 
-## Usage
-* Download the **release** version (not clone repository) [above](#download).
-* The downloaded release should be named `Rank14LosSA-Classic`. If yours is named `Rank14LosSA-Classic-master` then you have cloned the repository by mistake.
-* Unzip the release if necessary. You should have one folder named `Rank14LosSA-Classic/` with a `Rank14LosSA-Classic.toc` file directly inside.
-* Move the folder into `<CLASSIC_WOW_HOME>/Interface/addons/`, which on Windows by default would be `C:/MY_USER_NAME_HERE/Program Files (x86)/World of Warcraft/_classic_/Interface/AddOns/`
-* Ensure the addon is loaded in your 'addons' menu in the character selection screen.
+*Screenshots may not always demonstrate the experience of the most recent release of Rank14LosSA.*
 
-Any of the following commands are acceptable
+# DOWNLOAD
+
+#### Automatic: [Curseforge / Twitch App](https://www.curseforge.com/wow/addons/rank14lossa-classic)
+
+* (Recommended) Updates may/will install automatically.
+* Download the [Twitch App](https://www.twitch.tv/downloads) and search `Rank14LosSA-Classic`
+
+#### Manual| [GitHub Latest Release](https://github.com/KevinTyrrell/Rank14LosSA-Classic/releases/latest)
+
+* Download `Rank14LosSA-Classic.zip` and unzip it.
+* Ensure the folder is named `Rank14LosSA-Classic` and directly inside resides a `src/`, `/res/`, and `.toc` file(s).
+* Place `Rank14LosSA-Classic/` into your `<CLASSICWOWHOME>/World of Warcraft\_classic_/Interface/Addons/` folder.
+* Check this repository in the future for updated versions.
+
+# USAGE
+
+The addon will automatically notify you of incoming spell alerts. Ensure your in-game sound is turned on, as the addon uses the SFX sound channel to play sounds (*Note: This will be an option in the future*).
+
+##### CLI (*Command Line Interface*) /Slash Commands
+
 ```
 /rsa /rank14 /r14 /r14lossa /rank14lossa /lossa /sa /soundalerter /gsa /gladiatorlossa
 ```
 
-## Contributors
-* [superk589](https://www.curseforge.com/members/superk589/projects) - Original Author of [GladiatorLosSA](https://www.curseforge.com/wow/addons/GladiatorlosSA)
-* Nogall (Feenix-Warsong) - Original Author of GladiatorLosSA's 1.12.1 port: Rank14LosSA
+| Command | Parameter | Result |
+| :-----: | --------- | ------ |
+|         |           | *List of commands are printed.*
+| alerts  |           | *Alphabetical list of all alerts and their statuses are printed.*
+| toggle  | Alert Name| *Alert is toggled on/off*.
 
-### Translations
-* TBD
+##### Example
 
-## License 
-* see [LICENSE](https://github.com/KevinTyrrell/Rank14LosSA-Classic/blob/master/LICENSE.md) file
+```
+/rsa toggle Battle Stance
+```
 
-## Version 
+> Battle Stance is now: DISABLED
+
+When enemy players cast Battle Stance, there will be no auditory warning. This will be saved during the next UI reload (`/reload`), logout, or game exit.
+
+```
+/soundalerter toggle Battle Stance
+```
+
+> Battle Stance is now: ENABLED
+
+# LICENSE
+* see [LICENSE](LICENSE.md) file
+
+# VERSION 
 * Version 2.0.0
 
-## Contact
+# CONTACT
 #### Kevin Tyrrell
 * e-mail: KevinTearUl@gmail.com
