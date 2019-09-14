@@ -2,8 +2,12 @@ Rank14LosSA-Classic
 ======
 **Rank14LosSA-Classic** is a World of Warcraft: Classic AddOn used to auditorily notify you of important spells used around you. This addon is a complete rewrite of *Nogall's (Feenix-Warsong)* **_Rank14LosSA_**, which itself was a backport of **_GladiatorlosSA_**.
 <p align="center">
-  <img src="https://github.com/KevinTyrrell/Rank14LosSA-Classic/blob/master/res/Images/Thumbnail.png?raw=true" alt="Rank14LosSA Thumbnail"/>
+  <img src="https://github.com/KevinTyrrell/Rank14LosSA-Classic/blob/master/res/Images/Thumbnail-400x400.png?raw=true" alt="Rank14LosSA Thumbnail"/>
 </p>
+
+<br>
+
+## Table of Contents
 
 - [SCREENSHOT](#screenshot)
 - [DOWNLOAD](#download)
