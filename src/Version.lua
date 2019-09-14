@@ -20,11 +20,14 @@
 
 --[[ AddOn Namespace ]]--
 local _, R14LosSA = ...
---[[ Cached variables. ]]--
-local setmetatable, tostring = setmetatable, tostring
+--[[ Included global identifiers. ]]--
+local setmetatable, tostring, setfenv, unpack = setmetatable, tostring, setfenv, unpack
+--[[ Included package identifiers. ]]--
+setfenv(1, R14LosSA)
+local READ_ONLY_METATABLE = READ_ONLY_METATABLE
 --[[ Version Module. ]]--
-local Version = { }
-setfenv(1, Version)
+local Module = { }; Version = Module;
+setfenv(1, Module)
 
 --[[
 -- Semantic Versioning
@@ -32,15 +35,20 @@ setfenv(1, Version)
 -- Increment Z when you fix something.
 -- Increment Y when you add a new feature.
 -- Increment X when you break backwards-compatibility or add major features.
--- @see https://datasift.github.io/gitflow/Versioning.html
 --]]
 local X, Y, Z = 2, 0, 0
-local str = tostring(X) .. "." .. tostring(Y) .. "." .. tostring(Z)
 
 --[[
--- Version String in form x.y.z
+-- Version number, seperated by section.
 ]]--
-VERSION = str
+TABLE = { X, Y, Z }
+
+--[[
+-- Version String in form X.Y.Z.
+--
+-- @see Semantic Versioning: https://datasift.github.io/gitflow/Versioning.html
+]]--
+VERSION = tostring(X) .. "." .. tostring(Y) .. "." .. tostring(Z)
 
 --[[
 -- Determines if the specified version matches the current version.
@@ -49,10 +57,8 @@ VERSION = str
 -- @return boolean True if the specified version matches the current version.
 -- @see Version.VERSION
 ]]--
-function match(other_version)
-    return VERSION.X == other_version.X and VERSION.Y == other_version.Y and VERSION.Z == other_version.Z end
+function match(other_version_number)
+    local x, y, z = unpack(other_version_number)
+    return X == x and Y == y and Z == z end
 
-local function tostring() return str end
-
-R14LosSA.Version = setmetatable(Version, { __tostring = tostring, __call = tostring, 
-    __newindex = function() error("Cannot modify read-only table.") end })
+setmetatable(Module, READ_ONLY_METATABLE) -- Module loaded.

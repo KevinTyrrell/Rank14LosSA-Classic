@@ -7,9 +7,13 @@
 ## DefaultState: enabled
 ## SavedVariables: RSA_Preferences
 
-# Setup for the AddOn namespace.
-src/Core.lua
+# Versioning of the addon.
+src\Version.lua
+# Core global functions.
+src\Core.lua
 # Spell database.
-src/Spells.lua
-# Rank14LosSA module.
-src/RSA.lua
+src\Spells.lua
+# User's saved preferences.
+src\Preferences.lua
+# API calls.
+src\RSA.lua

@@ -20,63 +20,116 @@
 
 --[[ AddOn Namespace ]]--
 local addOnName, R14LosSA = ...
+--[[ Included stdlib identifiers. ]]--
+local string, pairs, _tostring, setmetatable, insert =
+    string, pairs, tostring, setmetatable, table.insert
+local lower, gmatch = string.lower, string.gmatch
+--[[ Included WoW API identifiers. ]]--
+local PlaySoundFile, CreateFrame, CombatLogGetCurrentEventInfo =
+    PlaySoundFile, CreateFrame, CombatLogGetCurrentEventInfo
+--[[ Included package identifiers. ]]--
 setfenv(1, R14LosSA)
+local _G, Spells, Version, Preferences, trim, print = _G, Spells, Version, Preferences, trim, print
+local COLOR_RESET, COLOR_TITLE1, COLOR_TITLE2, COLOR_ENABLED, COLOR_DISABLED =
+    COLOR_RESET, COLOR_TITLE1, COLOR_TITLE2, COLOR_ENABLED, COLOR_DISABLED
+local query, toggle_alert, print_preferences, VERSION =
+    Spells.query, Preferences.toggle_alert, Preferences.print_preferences, Version.VERSION
 
---[[ Cached strings, placing them into a table would defeat the purpose. ]]--
+--[[ Cached API Strings. ]]--
 local PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD"
+local ADDON_LOADED = "ADDON_LOADED"
 local COMBAT_LOG_EVENT_UNFILTERED = "COMBAT_LOG_EVENT_UNFILTERED"
 
 --[[ Frame used to hook into events. ]]--
 local frame = CreateFrame("Frame")
+local RegisterEvent, UnregisterEvent = frame.RegisterEvent, frame.UnregisterEvent
 --[[ Begin listening to the following events: ]]--
-frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+RegisterEvent(frame, PLAYER_ENTERING_WORLD)
+RegisterEvent(frame, ADDON_LOADED)
 
 --[[
 -- Disables sound files from being played.
 ]]--
-function sound_disable()
-    frame:UnregisterEvent(COMBAT_LOG_EVENT_UNFILTERED)
-end
+local function sound_disable()
+    UnregisterEvent(frame, COMBAT_LOG_EVENT_UNFILTERED) end
 
 --[[
 -- Enables the playing of sound files.
 ]]--
-function sound_enable()
-    frame:RegisterEvent(COMBAT_LOG_EVENT_UNFILTERED)
-end
+local function sound_enable()
+    RegisterEvent(frame, COMBAT_LOG_EVENT_UNFILTERED) end
+
+-- Prints a splash title dictating the addon's name, version, and author.
+local print_splash = (function()
+    local COLOR_VERSION = "|cFF4DE1FF"
+    local splash = COLOR_TITLE1 .. "R14" .. COLOR_TITLE2 .. "LosSA" .. COLOR_RESET .. 
+            ": v" .. COLOR_VERSION .. VERSION .. COLOR_RESET .. " by Kevin Tyrrell"
+    return function() print(splash) end
+end)()
+
+-- Map of slash commands to their callback handlers.
+local CLI_handlers = {
+    toggle = setmetatable({ }, { 
+        __tostring = function() return 
+            "Toggles a specified alert (case sensitive). e.g. /rsa toggle Nature's Swiftness" end,
+        __call = (function()
+            local MSG_ENABLED = " is now " .. COLOR_ENABLED .. "ENABLED" .. COLOR_RESET .. "."
+            local MSG_DISABLED = " is now " .. COLOR_DISABLED .. "DISABLED" .. COLOR_RESET .. "."
+            local MSG_ERR = "No such alert exists. Use command '" .. COLOR_TITLE1 ..
+                    "alerts'" .. COLOR_RESET .. " to see possible alerts."
+            return function(_, alert_name)
+                local result = toggle_alert(alert_name)
+                if result == true then
+                    print(alert_name .. MSG_ENABLED)
+                elseif result == false then
+                    print(alert_name .. MSG_DISABLED)
+                else print(MSG_ERR) end
+            end
+        end)(),
+    }),
+    alerts = setmetatable({ }, {
+        __tostring = function() return "Displays all possible alert names to toggle. e.g. /r14 alerts" end,
+        __call = function()
+            print_preferences()
+        end
+    })
+}
 
 -- Blizzard API requirement for setting up /slash commands.
 function _G.SlashCmdList.RSA(msg, editBox)
+    -- TODO: Wrote this quick and dirty. Should be done properly with regex.
     msg = trim(msg)
-    DEFAULT_CHAT_FRAME:AddMessage("RSA: To be completed.", 1.0, 0.6, 0.2, 53, 10);
+    if msg == "" then
+        print_splash()
+        for command, callback in pairs(CLI_handlers) do
+            -- Print the command along with its description
+            print("/" .. command .. ": " .. _tostring(callback))
+        end
+    else
+        local param, cmd = "", nil
+        for word in gmatch(msg, "%w+") do
+            if cmd == nil then
+                cmd = lower(word)
+            elseif param == "" then
+                param = word
+            else param = param .. " " .. word end
+        end
+    
+        -- Differ handling of the command to the handler.
+        local cb = CLI_handlers[cmd]
+        if cb ~= nil then cb(param) 
+        else print("Command '" .. cmd .. "' is not recognized.") end
+    end
 end
 
 -- Blizzard API requirement for naming convention.
 _G.SLASH_RSA1, _G.SLASH_RSA2, _G.SLASH_RSA3, _G.SLASH_RSA4, _G.SLASH_RSA5, _G.SLASH_RSA6, _G.SLASH_RSA7, _G.SLASH_RSA8, _G.SLASH_RSA9, _G.SLASH_RSA10
-    = "/rsa", "/rank14", "/r14", "/r14lossa", "/rank14lossa", "/lossa", "/sa", "/soundalerter", "/gsa", "/gladiatorlossa"
+    = "/rsa", "/rank14", "/r14", "/r14lossa", "/rank14lossa", "/lossa", "/sa", "/soundalerter", "/gsa", "/gladiatorlossa"    
 
---[[
--- @return true if the flag represents a hostile player.
--- @see CombatLogGetCurrentEventInfo
-]]--
-local is_hostile_player = (function()
-    local band = bit.band
-    return function(flag)
-        return band(flag, COMBATLOG_OBJECT_TYPE_MASK) == COMBATLOG_OBJECT_TYPE_PLAYER
-          and band(flag, COMBATLOG_OBJECT_REACTION_MASK) == COMBATLOG_OBJECT_REACTION_HOSTILE
-    end
-end)()
-
---[[
--- @return true if the flag represents the client player.
--- @see CombatLogGetCurrentEventInfo
-]]--
-local is_client_player = (function()  
-    local band = bit.band
-    return function(flag)
-        return band(flag, COMBATLOG_OBJECT_AFFILIATION_MASK) == COMBATLOG_OBJECT_AFFILIATION_MINE
-    end
-end)()
+local PATH_SOUND = "Interface\\AddOns\\" .. addOnName .. "\\res\\Voice\\"
+local PATH_EXTENSION = ".ogg"
+-- TODO: Allow the user to switch between the two.
+local SOUND_CHANNEL_MASTER, SOUND_CHANNEL_SFX = "Master", "SFX"
 
 --[[
 -- Attempts to play a sound from the voice folder.
@@ -85,60 +138,8 @@ end)()
 -- @see PlaySoundFile
 ]]--
 function play_sound(spell_name)
-	PlaySoundFile("Interface\\AddOns\\" .. addOnName .. "\\res\\Voice\\" .. spell_name .. ".ogg", "SFX")
+	PlaySoundFile(PATH_SOUND .. spell_name .. PATH_EXTENSION, SOUND_CHANNEL_SFX)
 end
-
---[[
--- Waits a specified amount of time, then calls a callback function.
---
--- @param delay Amount of time to wait in seconds (ex. 0.5 for half-second)
--- @param func Callback function to be called after the delay.
--- @param ... Arguments to be passed to the callback function.
--- Source: https://wowwiki.fandom.com/wiki/USERAPI_wait
-]]--
-local wait = (function()
-    local waitTable = {};
-    local waitFrame = nil;
-    
-    return function(delay, func, ...)
-        if(type(delay)~="number" or type(func)~="function") then
-            return false; end
-        if(waitFrame == nil) then
-            waitFrame = CreateFrame("Frame","WaitFrame", UIParent);
-            waitFrame:SetScript("onUpdate", function(self,elapse)
-                local count = #waitTable;
-                local i = 1;
-                while(i<=count) do
-                    local waitRecord = tremove(waitTable,i);
-                    local d = tremove(waitRecord,1);
-                    local f = tremove(waitRecord,1);
-                    local p = tremove(waitRecord,1);
-                    if(d>elapse) then
-                        tinsert(waitTable,i,{d-elapse,f,p});
-                        i = i + 1;
-                    else
-                        count = count - 1;
-                        f(unpack(p));
-                    end
-                end
-            end);
-        end
-    
-        tinsert(waitTable,{delay,func,{...}});
-        return true;
-    end
-end)()
-
---[[
--- @return true if the client player is in a battleground.
--- @see GetRealZoneText
-]]--
-local is_in_battleground = (function()
-	local bgs = { "Alterac Valley", "Arathi Basin", "Warsong Gulch" }
-	return function()
-		return bgs[GetRealZoneText()] ~= nil
-	end
-end)()
 
 --[[
 -- Called when the addon is loaded.
@@ -146,20 +147,23 @@ end)()
 local function load()
     -- No need to view this event anymore.
     frame:UnregisterEvent(PLAYER_ENTERING_WORLD)
-    greetings()
+    print_splash()
     sound_enable()
 end
 
 --[[
--- Script called when an in-game event occurs.
+-- Script called when any in-game event occurs.
 ]]--
 frame:SetScript("OnEvent", function(userdata, event, ...)
 	if event == PLAYER_ENTERING_WORLD then
         load()
+    elseif event == ADDON_LOADED then
+        Preferences.init()
+        frame:UnregisterEvent(ADDON_LOADED)
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
-        local _, sub_event, _, _, _, source_flags, _, _, _, target_flags, _, _, spell_name = CombatLogGetCurrentEventInfo()
-        sound_query(sub_event, spell_name, source_flags, target_flags)
-    elseif event == "ZONE_CHANGED_NEW_AREA" then
-		print("A")
+        local _, sub_event, _, _, _, source_flags, _, _, _, target_flags,
+            _, _, spell_name = CombatLogGetCurrentEventInfo()
+        query(sub_event, spell_name, source_flags, target_flags)
     end
+    -- TODO: Enable or disable feature while inside of Battlegrounds.
 end)

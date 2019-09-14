@@ -19,216 +19,270 @@
 ]]--
 
 --[[ AddOn Namespace ]]--
-local addOnName, R14LosSA = ...
+local _, R14LosSA = ...
+--[[ Included global identifiers. ]]--
+local insert, assert, bor, ipairs, setfenv, setmetatable = table.insert, assert, bit.bor, ipairs, setfenv, setmetatable
+-- Combat log flags to determine source and target of spells.
+local CL_OTPLR, CL_OCP, CL_ORF, CL_OAM, CL_OTPET, CL_ORH, CL_OAO, CL_OAP = 
+    COMBATLOG_OBJECT_TYPE_PLAYER, COMBATLOG_OBJECT_CONTROL_PLAYER, COMBATLOG_OBJECT_REACTION_FRIENDLY,
+    COMBATLOG_OBJECT_AFFILIATION_MINE, COMBATLOG_OBJECT_TYPE_PET, COMBATLOG_OBJECT_REACTION_HOSTILE,
+    COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, COMBATLOG_OBJECT_AFFILIATION_PARTY
+--[[ Included package identifiers. ]]--
 setfenv(1, R14LosSA)
+local get_or_put, ternary, READ_ONLY_METATABLE = get_or_put, ternary, READ_ONLY_METATABLE
+--[[ Spells Module. ]]--
+local Module = { }; Spells = Module
+setfenv(1, Module)
 
-local bor = bit.bor
--- Mask to determine unit type.
-local UNIT_FLAG_MASK = bor(COMBATLOG_OBJECT_TYPE_MASK, COMBATLOG_OBJECT_CONTROL_MASK,
-    COMBATLOG_OBJECT_REACTION_MASK, COMBATLOG_OBJECT_AFFILIATION_MASK)
--- Player, Controlled by Player, Friendly, Mine.
-local FLAG_F_PLAYER = bor(COMBATLOG_OBJECT_TYPE_PLAYER, COMBATLOG_OBJECT_CONTROL_PLAYER, 
-    COMBATLOG_OBJECT_REACTION_FRIENDLY, COMBATLOG_OBJECT_AFFILIATION_MINE)
--- Pet, Controlled by Player, Hostile, and Anonymous.
-local FLAG_H_ENEMY_PET = bor(COMBATLOG_OBJECT_TYPE_PET, COMBATLOG_OBJECT_CONTROL_PLAYER,
-    COMBATLOG_OBJECT_REACTION_HOSTILE, COMBATLOG_OBJECT_AFFILIATION_OUTSIDER)
--- Player, Controlled by Player, Hostile, and Anonymous.
-local FLAG_H_ENEMY_PLAYER = bor(COMBATLOG_OBJECT_TYPE_PLAYER, COMBATLOG_OBJECT_CONTROL_PLAYER,
-    COMBATLOG_OBJECT_REACTION_HOSTILE, COMBATLOG_OBJECT_AFFILIATION_OUTSIDER)
--- Player, Controlled by Player, Friendly, and Party Member.
-local FLAG_F_PARTY_PLAYER = bor(COMBATLOG_OBJECT_TYPE_PLAYER, COMBATLOG_OBJECT_CONTROL_PLAYER,
-    COMBATLOG_OBJECT_REACTION_FRIENDLY, COMBATLOG_OBJECT_AFFILIATION_PARTY)
-
--- Events in which RSA must react to.
-local SPELL_AURA_APPLIED = "SPELL_AURA_APPLIED"
-local SPELL_CAST_START = "SPELL_CAST_START"
-local SPELL_AURA_REMOVED = "SPELL_AURA_REMOVED"
-local SPELL_CAST_SUCCESS = "SPELL_CAST_SUCCESS"
-
--- Maps in-game events to their related spells.
+--[[ List of all unique spell event names, sorted alphabetically. ]]--
+local SPELL_EVENT_NAMES = { }; Module.SPELL_EVENT_NAMES = SPELL_EVENT_NAMES
+-- (Map)[API-events] --> (Map)[Spell Names] --> { Spell Tables }
 local spell_database = { }
--- Maps spell aliases to boolean flags: true->enabled
-local spell_prefs = { }
+-- (Map)[Alerts] --> { Spell Tables }
+local event_spell_map = { }
 
 --[[
--- Attempts to play a sound file, given the right circumstances.
---
--- @param spell_name string Name of the spell from the combat log.
--- @param event_trigger string Name of the event which triggers the sound file.
--- @param sound_name string Name of the sound file.
--- @param [source] number Unit flags of the source of the spell.
--- @param [target] number Unit flags of the target of the spell.
--- @param [sound] string Name of the sound file to be played.
--- @param [alias] string Unique identifier for the spell.
+-- @return boolean true if the spell alert is enabled.
 ]]--
-local spell_entry = (function()
-    local function default_val_callback() return { } end
-    
-    return function(spell_name, event_trigger, source, target, sound, use_sound_name)
-        sound = sound or spell_name
-        --[[ What this spell appears as to the user.
-        -- Spells like 'Polymorph' have the same name, but use different sound alerts.
-        --   but spells like Ancestral Recall and Hearthstone use the same name. ]]--
-        local alias = ternary(use_sound_name == true, sound, spell_name)
-        -- By default all spells are enabled.
-        spell_prefs[alias] = true
-        
-        -- Retrieve all spell tables that relate to this event.
-        local spells_for_event = get_and_put(spell_database, event_trigger, default_val_callback)
-        -- Retrieve all spell tables that also share the name and spell ID.
-        local spells_for_name = get_and_put(spells_for_event, spell_name, default_val_callback)
-        table.insert(spells_for_name, {
-            alias = alias,
-            sound = sound,
-            source = source,
-            target = target
-        })
-    end
-end)()
+function get_alert(alert)
+	local spell_table = event_spell_map[alert]
+	if spell_table == nil then return nil end -- Invalid alert.
+	return spell_table.enabled
+end
+
+--[[
+-- Changes a spell's alert setting.
+-- A spell alert that is disabled will not trigger.
+--
+-- @param alert string Spell alert name.
+-- @param enabled boolean True to disable the spell alert.
+-- @return enabled, if the alert name is valid. Otherwise nil.
+]]--
+function set_alert(alert, enabled)
+	local spell_table = event_spell_map[alert]
+	if spell_table == nil then return nil end -- Invalid alert.
+	spell_table.enabled = enabled
+	return enabled
+end
+
+local play_sound -- LOD function.
 
 --[[
 -- Queries to see if the specified spell should be alerted.
 --
--- @param event string Event name from the WoW API (ex. "SPELL_AURA_APPLIED")
--- @param source number Bitfield flags from the WoW API for the source of the spell.
--- @param target number Bitfield flags from the WoW API for the target of the spell.
+-- @param event string WoW API event.
+-- @param spell_name string Name of the spell from the combat log.
+-- @param [source] number Source unit flags.
+-- @param [target] number Target unit flags.
 ]]--
-function sound_query(event, spell_name, source, target)
-    local spells_for_event = spell_database[event]
-    if spells_for_event == nil then return end
-    local spells_for_name = spells_for_event[spell_name]
-    if spells_for_name == nil then return end
-    
-    for _, spell_table in pairs(spells_for_name) do
-        local src, tar = spell_table.source, spell_table.target
-        if (src == nil or src == source) and (tar == nil or tar == target) then
-            play_sound(spell_table.sound) return end
-    end
+function query(event, spell_name, source, target)
+	local spells_for_event = spell_database[event]
+	if spells_for_event == nil then return end
+	local spells_for_name = spells_for_event[spell_name]
+	if spells_for_name == nil then return end
+
+	for _, spell_table in ipairs(spells_for_name) do
+		local src, tar = spell_table.source, spell_table.target
+		-- If the targets are what the sound was intended for, play the sound file.
+		if (src == nil or src == source) and (tar == nil or tar == target) and spell_table.enabled then
+			play_sound = play_sound or R14LosSA.play_sound -- Load on demand.
+			play_sound(spell_table.sound) return
+		end
+	end
 end
 
--- TODO: Big Heal
--- TODO: Shadowmeld -> Stealth
-spell_entry("Adrenaline Rush", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Aimed Shot", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Arcane Power", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Banish", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Barkskin", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Battle Stance", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Berserker Rage", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Berserker Stance", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Bestial Wrath", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Blade Flurry", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Blessing of Freedom", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Blessing of Protection", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Blessing of Protection", SPELL_AURA_REMOVED, FLAG_H_ENEMY_PLAYER, nil, "Blessing of Protection Down")
-spell_entry("Blessing of Sacrifice", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Blind", SPELL_AURA_APPLIED, nil, FLAG_F_PLAYER)
-spell_entry("Blind", SPELL_AURA_REMOVED, FLAG_H_ENEMY_PLAYER, nil, "Blind Down")
-spell_entry("Blind", SPELL_AURA_APPLIED, FLAG_F_PARTY_PLAYER, FLAG_H_ENEMY_PLAYER, "Blind Enemy")
-spell_entry("Blind", SPELL_AURA_APPLIED, nil, FLAG_F_PARTY_PLAYER, "Blind Friend")
-spell_entry("Blood Fury", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Cannibalize", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Cold Blood", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Cold Snap", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Combustion", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Concussion Blow", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER, FLAG_F_PLAYER)
-spell_entry("Counterspell", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Dash", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Death Coil", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Death Wish", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Death Wish", SPELL_AURA_REMOVED, FLAG_H_ENEMY_PLAYER, nil, "Death Wish Down", true)
-spell_entry("Defensive Stance", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Desperate Prayer", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Deterrence", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Deterrence", SPELL_AURA_REMOVED, FLAG_H_ENEMY_PLAYER, nil, "Deterrence Down", true)
-spell_entry("Disarm", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Riposte", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER, nil, "Disarm")
-spell_entry("Divine Favor", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Divine Shield", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Divine Shield", SPELL_AURA_REMOVED, FLAG_H_ENEMY_PLAYER, nil, "Divine Shield Down", true)
-spell_entry("Earthbind Totem", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Elemental Mastery", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Enrage", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Entangling Roots", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Escape Artist", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Evasion", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Evasion", SPELL_AURA_REMOVED, FLAG_H_ENEMY_PLAYER, nil, "Evasion Down", true)
-spell_entry("Evocation", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Fear Ward", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Fel Domination", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("First Aid", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Freezing Trap", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Frenzied Regeneration", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Grounding Totem", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Hammer of Justice", SPELL_AURA_APPLIED, nil, FLAG_F_PLAYER)
-spell_entry("Astral Recall", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER, nil, "Hearthstone")
-spell_entry("Hearthstone", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Hibernate", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Ice Block", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Ice Block", SPELL_AURA_REMOVED, FLAG_H_ENEMY_PLAYER, nil, "Ice Block Down", true)
-spell_entry("Improved Hamstring", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER, FLAG_F_PLAYER)
-spell_entry("Inner Focus", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Innervate", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Intimidation", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Invisibility", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER, nil, "Lesser Invisibility Potion", true)
-spell_entry("Invisibility", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER, nil, "Invisibility Potion", true)
-spell_entry("Kick", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Last Stand", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Mana Burn", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Mana Tide Totem", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Mind Control", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Nature's Grasp", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Nature's Swiftness", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER) -- TODO: Differentiate Druid/Shaman?
-spell_entry("Polymorph", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER, FLAG_F_PLAYER)
-spell_entry("Polymorph", SPELL_AURA_REMOVED, nil, nil, "Polymorph Down", true)
-spell_entry("Polymorph", SPELL_CAST_START, FLAG_F_PARTY_PLAYER, FLAG_H_ENEMY_PLAYER, "Polymorph Enemy", true)
-spell_entry("Polymorph", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER, FLAG_F_PARTY_PLAYER, "Polymorph Friend", true)
-spell_entry("Polymorph", SPELL_AURA_APPLIED, nil, FLAG_F_PARTY_PLAYER, "Polymorph Friend2", true)
-spell_entry("Power Infusion", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Preparation", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Presence of Mind", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Pummel", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Rapid Fire", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Readiness", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Recklessness", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Recklessness Down", SPELL_AURA_REMOVED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Fire Reflector", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER, nil, "Reflector")
-spell_entry("Frost Reflector", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER, nil, "Reflector")
-spell_entry("Shadow Reflector", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER, nil, "Reflector")
-spell_entry("Repentance", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Defibrillate", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER, nil, "Resurrection") -- Jumper Cables
-spell_entry("Ancestral Spirit", SPELL_CAST_START, "Ancestral Spirit", FLAG_H_ENEMY_PLAYER, nil, "Resurrection")
-spell_entry("Rebirth", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER, nil, "Resurrection")
-spell_entry("Redemption", SPELL_CAST_START, "Redemption", FLAG_H_ENEMY_PLAYER, nil, "Resurrection")
-spell_entry("Resurrection", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Retaliation", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Revive Pet", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Sap", SPELL_AURA_APPLIED, nil, FLAG_F_PLAYER)
-spell_entry("Sap", SPELL_AURA_APPLIED, FLAG_F_PARTY_PLAYER, FLAG_H_ENEMY_PLAYER, "Sap Enemy", true)
-spell_entry("Sap", SPELL_AURA_APPLIED, nil, FLAG_F_PARTY_PLAYER, "Sap Friend", true)
-spell_entry("Scare Beast", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Scatter Shot", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Seduction", SPELL_CAST_START, FLAG_H_ENEMY_PET)
-spell_entry("Shackle Undead", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Shield Bash", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Shield Wall", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Shield Wall", SPELL_AURA_REMOVED, FLAG_H_ENEMY_PLAYER, nil, "Shield Wall Down", true)
-spell_entry("Silence", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Sprint", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Stealth", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Stoneform", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
---spell_entry("Concussion Blow", SPELL_AURA_APPLIED, nil, FLAG_F_PARTY_PLAYER, "Stunned Friend") -- TODO: Alias is not unique
-spell_entry("Hammer of Justice", SPELL_AURA_APPLIED, nil, FLAG_F_PARTY_PLAYER, "Stunned Friend", true)
-spell_entry("Summon Imp", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER, nil, "Summon Demon")
-spell_entry("Summon Felhunter", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER, nil, "Summon Demon")
-spell_entry("Summon Voidwalker", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER, nil, "Summon Demon")
-spell_entry("Summon Succubus", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER, nil, "Summon Demon")
-spell_entry("Inferno", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER, nil, "Summon Demon")
-spell_entry("Ritual of Doom", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER, nil, "Summon Demon")
-spell_entry("Sweeping Strikes", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Tranquility", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Tremor Totem", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("Vanish", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
-spell_entry("War Stomp", SPELL_CAST_START, FLAG_H_ENEMY_PLAYER)
-spell_entry("Will of the Forsaken", SPELL_AURA_APPLIED, FLAG_H_ENEMY_PLAYER)
-spell_entry("Wyvern Sting", SPELL_CAST_SUCCESS, FLAG_H_ENEMY_PLAYER)
+--[[
+-- Object which builds spell events. (Builder Design Pattern)
+]]--
+local spell_builder = (function()
+    local sb = { }
+    -- Optional arguments to the builder.
+    local source_flags, target_flags, spell, sound
+    -- Callback for get_or_put
+    local function make_table_cb() return { } end
+
+    --[[ Source unit flags of the caster. If not specified, any source is used. ]]-- 
+    function sb.source(flags) source_flags = flags; return sb end
+    --[[ Target unit flags of the caster. If not specified, any target is used. ]]--
+    function sb.target(flags) target_flags = flags; return sb end
+    --[[ Name of the spell from the combat log. If not specified, alert name is used. ]]--
+    function sb.spell(name) spell = name; return sb end
+    --[[ Name of the sound to be played. If not specified, alert name is used. ]]--
+    function sb.sound(name) sound = name; return sb end
+    
+    --[[
+    -- Builds the current spell event. Calling this method resets the builder.
+    --
+    -- @param alert string Unqiue identifier for the spell alert.
+    ]]--
+    function sb.build(alert, event)
+        assert(event_spell_map[alert] == nil) -- Event name must be unique.
+        insert(SPELL_EVENT_NAMES, alert)
+    
+        --[[    [1] source flags of the spell       [2] target flags of the spell
+                [3] name of the sound file          [3] alert active by default     ]]--
+        local spell_table = {
+			source = source_flags, target = target_flags,
+			sound = ternary(sound ~= nil, sound, alert), enabled = true
+		}
+		event_spell_map[alert] = spell_table -- Allow lookups by event name (unique).
+
+        -- Retrieve all spell tables that relate to this event.
+        local spells_for_event = get_or_put(spell_database, event, make_table_cb)
+        -- Retrieve all spell tables that also share the name and spell ID.
+        local spells_for_name = get_or_put(spells_for_event, ternary(spell ~= nil, spell, alert), make_table_cb)
+        insert(spells_for_name, spell_table)
+    
+        -- Reset the builder for the next spell.
+        source_flags, target_flags, spell, sound = nil, nil, nil, nil
+        return sb
+    end
+    
+    return sb
+end)()
+
+-- API Events in which sounds may be played for.
+local AURA_APP = "SPELL_AURA_APPLIED"
+local CAST_SRT = "SPELL_CAST_START"
+local AURA_REM = "SPELL_AURA_REMOVED"
+local CAST_SCS = "SPELL_CAST_SUCCESS"
+-- Player, Controlled by Player, Friendly, Mine.
+local FLAG_F_PLR = bor(CL_OTPLR, CL_OCP, CL_ORF, CL_OAM)
+-- Pet, Controlled by Player, Hostile, and Anonymous.
+local FLAG_H_PET = bor(CL_OTPET, CL_OCP, CL_ORH, CL_OAO)
+-- Player, Controlled by Player, Hostile, and Anonymous.
+local FLAG_H_PLR = bor(CL_OTPLR, CL_OCP, CL_ORH, CL_OAO)
+-- Player, Controlled by Player, Friendly, and Party Member.
+local FLAG_F_PTY = bor(CL_OTPLR, CL_OCP, CL_ORF, CL_OAP)
+
+-- TODO: Big Heal, Shadowmeld -> Stealth, Spell Locked, Counterspelled, Kicked
+
+spell_builder
+    .source(FLAG_H_PLR).build("Adrenaline Rush", AURA_APP)
+    .source(FLAG_H_PLR).build("Aimed Shot", CAST_SRT)
+    .source(FLAG_H_PLR).build("Arcane Power", AURA_APP)
+    .source(FLAG_H_PLR).build("Banish", CAST_SRT)
+    .source(FLAG_H_PLR).build("Barkskin", AURA_APP)
+    .source(FLAG_H_PLR).build("Battle Stance", AURA_APP)
+    .source(FLAG_H_PLR).build("Berserker Rage", AURA_APP)
+    .source(FLAG_H_PLR).build("Berserker Stance", AURA_APP)
+    .source(FLAG_H_PLR).build("Bestial Wrath", CAST_SCS)
+    .source(FLAG_H_PLR).build("Blade Flurry", AURA_APP)
+    .source(FLAG_H_PLR).build("Blessing of Freedom", AURA_APP)
+	.source(FLAG_H_PLR).build("Blessing of Protection", AURA_APP)
+	.source(FLAG_H_PLR).spell("Blessing of Protection").build("Blessing of Protection Down", AURA_REM)
+	.source(FLAG_H_PLR).build("Blessing of Sacrifice", AURA_APP)
+	.target(FLAG_F_PLR).build("Blind", AURA_APP)
+	.source(FLAG_H_PLR).spell("Blind").build("Blind Down", AURA_REM)
+	.source(FLAG_F_PTY).target(FLAG_H_PLR).spell("Blind").build("Blind Enemy", AURA_APP)
+	.target(FLAG_F_PTY).spell("Blind").build("Blind Friend", AURA_APP)
+	.source(FLAG_H_PLR).build("Blood Fury", AURA_APP)
+	.source(FLAG_H_PLR).build("Cannibalize", CAST_SCS)
+	.source(FLAG_H_PLR).build("Cold Blood", AURA_APP)
+	.source(FLAG_H_PLR).build("Cold Snap", CAST_SCS)
+	.source(FLAG_H_PLR).build("Combustion", AURA_APP)
+	.source(FLAG_H_PLR).target(FLAG_F_PLR).build("Concussion Blow", AURA_APP)
+	.source(FLAG_H_PLR).build("Counterspell", CAST_SCS)
+	.source(FLAG_H_PLR).build("Dash", AURA_APP)
+	.source(FLAG_H_PLR).build("Death Coil", CAST_SCS)
+	.source(FLAG_H_PLR).build("Death Wish", AURA_APP)
+	.source(FLAG_H_PLR).spell("Death Wish").build("Death Wish Down", AURA_REM)
+	.source(FLAG_H_PLR).build("Defensive Stance", AURA_APP)
+	.source(FLAG_H_PLR).build("Desperate Prayer", CAST_SCS)
+	.source(FLAG_H_PLR).build("Deterrence", AURA_APP)
+	.source(FLAG_H_PLR).spell("Deterrence").build("Deterrence Down", AURA_REM)
+	.source(FLAG_H_PLR).build("Disarm", AURA_APP)
+	.source(FLAG_H_PLR).sound("Disarm").build("Riposte", AURA_APP)
+	.source(FLAG_H_PLR).build("Divine Favor", AURA_APP)
+	.source(FLAG_H_PLR).build("Divine Shield", AURA_APP)
+	.source(FLAG_H_PLR).spell("Divine Shield").build("Divine Shield Down", AURA_REM)
+	.source(FLAG_H_PLR).build("Earthbind Totem", CAST_SCS)
+	.source(FLAG_H_PLR).build("Elemental Mastery", AURA_APP)
+	.source(FLAG_H_PLR).build("Enrage", AURA_APP) -- TODO: Differentiate Warrior/Druid?       
+	.source(FLAG_H_PLR).build("Entangling Roots", CAST_SRT)
+	.source(FLAG_H_PLR).build("Escape Artist", CAST_SRT)
+	.source(FLAG_H_PLR).build("Evasion", AURA_APP)
+	.source(FLAG_H_PLR).spell("Evasion").build("Evasion Down", AURA_REM)
+	.source(FLAG_H_PLR).build("Evocation", CAST_SCS)
+	.source(FLAG_H_PLR).build("Fear Ward", AURA_APP)
+	.source(FLAG_H_PLR).build("Fel Domination", AURA_APP)
+	.source(FLAG_H_PLR).build("First Aid", CAST_SCS)
+	.source(FLAG_H_PLR).build("Freezing Trap", CAST_SCS)
+	.source(FLAG_H_PLR).build("Frenzied Regeneration", AURA_APP)
+	.source(FLAG_H_PLR).build("Grounding Totem", CAST_SCS)
+	.target(FLAG_F_PLR).build("Hammer of Justice", AURA_APP)
+	.source(FLAG_H_PLR).sound("Hearthstone").build("Astral Recall", CAST_SRT)
+	.source(FLAG_H_PLR).build("Hearthstone", CAST_SRT)
+	.source(FLAG_H_PLR).build("Hibernate", CAST_SRT)
+	.source(FLAG_H_PLR).build("Ice Block", AURA_APP)
+	.source(FLAG_H_PLR).spell("Ice Block").build("Ice Block Down", AURA_REM)
+	.target(FLAG_F_PLR).build("Improved Hamstring", AURA_APP)
+	.source(FLAG_H_PLR).build("Inner Focus", AURA_APP)
+	.source(FLAG_H_PLR).build("Innervate", AURA_APP)
+	.source(FLAG_H_PLR).build("Intimidation", CAST_SCS)
+	.source(FLAG_H_PLR).sound("Invisibility").build("Lesser Invisibility Potion", AURA_APP)
+	.source(FLAG_H_PLR).sound("Invisibility").build("Invisibility Potion", AURA_APP)
+	.source(FLAG_H_PLR).build("Kick", CAST_SCS)
+	.source(FLAG_H_PLR).build("Last Stand", AURA_APP)
+	.source(FLAG_H_PLR).build("Mana Burn", CAST_SRT)
+	.source(FLAG_H_PLR).build("Mana Tide Totem", CAST_SCS)
+	.source(FLAG_H_PLR).build("Mind Control", CAST_SRT)
+	.source(FLAG_H_PLR).build("Nature's Grasp", AURA_APP)
+	.source(FLAG_H_PLR).build("Nature's Swiftness", AURA_APP) -- TODO: Differentiate Druid/Shaman?
+	.source(FLAG_H_PLR).target(FLAG_F_PLR).build("Polymorph", CAST_SRT)
+	.spell("Polymorph").build("Polymorph Down", AURA_REM)
+	.source(FLAG_F_PTY).target(FLAG_H_PLR).spell("Polymorph").build("Polymorph Enemy", CAST_SRT)
+	.source(FLAG_H_PLR).target(FLAG_F_PTY).spell("Polymorph").build("Polymorph Friend", CAST_SRT)
+	.source(FLAG_H_PLR).target(FLAG_F_PTY).spell("Polymorph").build("Polymorph Friend2", AURA_APP)
+	.source(FLAG_H_PLR).build("Power Infusion", AURA_APP)
+	.source(FLAG_H_PLR).build("Preparation", CAST_SCS)
+	.source(FLAG_H_PLR).build("Presence of Mind", AURA_APP)
+	.source(FLAG_H_PLR).build("Pummel", CAST_SCS)
+	.source(FLAG_H_PLR).build("Rapid Fire", AURA_APP)
+	.source(FLAG_H_PLR).build("Readiness", CAST_SCS)
+	.source(FLAG_H_PLR).build("Recklessness", AURA_APP)
+	.source(FLAG_H_PLR).build("Recklessness Down", AURA_REM)
+	.source(FLAG_H_PLR).sound("Reflector").build("Fire Reflector", AURA_APP)
+	.source(FLAG_H_PLR).sound("Reflector").build("Frost Reflector", AURA_APP)
+	.source(FLAG_H_PLR).sound("Reflector").build("Shadow Reflector", AURA_APP)
+	.source(FLAG_H_PLR).build("Repentance", AURA_APP)
+	.source(FLAG_H_PLR).sound("Resurrection").spell("Defibrillate").build("Jumper Cables", CAST_SRT)
+	.source(FLAG_H_PLR).sound("Resurrection").build("Ancestral Spirit", CAST_SRT)
+	.source(FLAG_H_PLR).sound("Resurrection").build("Rebirth", CAST_SRT)
+	.source(FLAG_H_PLR).sound("Resurrection").build("Redemption", CAST_SRT)
+	.source(FLAG_H_PLR).build("Resurrection", CAST_SRT)
+	.source(FLAG_H_PLR).build("Retaliation", AURA_APP)
+	.source(FLAG_H_PLR).build("Revive Pet", CAST_SRT)
+	.source(FLAG_F_PLR).build("Sap", AURA_APP)
+	.source(FLAG_F_PTY).target(FLAG_H_PLR).spell("Sap").build("Sap Enemy", AURA_APP)
+	.source(FLAG_H_PLR).target(FLAG_F_PTY).spell("Sap").build("Sap Friend", AURA_APP)
+	.source(FLAG_H_PLR).build("Scare Beast", CAST_SRT)
+	.source(FLAG_H_PLR).build("Scatter Shot", CAST_SCS)
+	.source(FLAG_H_PET).build("Seduction", CAST_SRT)
+	.source(FLAG_H_PLR).build("Shackle Undead", CAST_SRT)
+	.source(FLAG_H_PLR).build("Shield Bash", CAST_SCS)
+	.source(FLAG_H_PLR).build("Shield Wall", AURA_APP)
+	.source(FLAG_H_PLR).spell("Shield Wall").build("Shield Wall Down", AURA_REM)
+	.source(FLAG_H_PLR).build("Silence", AURA_APP)
+	.source(FLAG_H_PLR).build("Sprint", AURA_APP)
+	.source(FLAG_H_PLR).build("Stealth", CAST_SCS)
+	.source(FLAG_H_PLR).build("Stoneform", AURA_APP)
+	.source(FLAG_H_PLR).target(FLAG_F_PTY)
+		.spell("Concussion Blow").sound("Stunned Friend").build("Concussion Blow2", AURA_APP)
+	.source(FLAG_H_PLR).target(FLAG_F_PTY)
+		.spell("Hammer of Justice").sound("Stunned Friend").build("Hammer of Justice2", AURA_APP)
+	.source(FLAG_H_PLR).sound("Summon Demon").build("Summon Imp", CAST_SRT)
+	.source(FLAG_H_PLR).sound("Summon Demon").build("Summon Felhunter", CAST_SRT)
+	.source(FLAG_H_PLR).sound("Summon Demon").build("Summon Voidwalker", CAST_SRT)
+	.source(FLAG_H_PLR).sound("Summon Demon").build("Summon Succubus", CAST_SRT)
+	.sound(FLAG_H_PLR).sound("Summon Demon").build("Inferno", CAST_SRT)
+	.sound(FLAG_H_PLR).sound("Summon Demon").build("Ritual of Doom", CAST_SRT)
+	.source(FLAG_H_PLR).build("Sweeping Strikes", AURA_APP)
+	.source(FLAG_H_PLR).build("Tranquility", CAST_SCS)
+	.source(FLAG_H_PLR).build("Tremor Totem", CAST_SCS)
+	.source(FLAG_H_PLR).build("Vanish", CAST_SCS)
+	.source(FLAG_H_PLR).build("War Stomp", CAST_SRT)
+	.source(FLAG_H_PLR).build("Will of the Forsaken", AURA_APP)
+	.source(FLAG_H_PLR).build("Wyvern Sting", CAST_SCS)
+
+setmetatable(Module, READ_ONLY_METATABLE) -- Module loaded.
