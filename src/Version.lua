@@ -36,7 +36,7 @@ setfenv(1, Module)
 -- Increment Y when you add a new feature.
 -- Increment X when you break backwards-compatibility or add major features.
 --]]
-local X, Y, Z = 2, 0, 0
+local X, Y, Z = 2, 0, 1
 
 --[[
 -- Version number, seperated by section.

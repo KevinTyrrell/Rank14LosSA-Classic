@@ -29,7 +29,7 @@ Rank14LosSA-Classic
 * (Recommended) Updates may/will install automatically.
 * Download the [Twitch App](https://www.twitch.tv/downloads) and search `Rank14LosSA-Classic`
 
-#### Manual| [GitHub Latest Release](https://github.com/KevinTyrrell/Rank14LosSA-Classic/releases/latest)
+#### Manual [GitHub Latest Release](https://github.com/KevinTyrrell/Rank14LosSA-Classic/releases/latest)
 
 * Download `Rank14LosSA-Classic.zip` and unzip it.
 * Ensure the folder is named `Rank14LosSA-Classic` and directly inside resides a `src/`, `/res/`, and `.toc` file(s).

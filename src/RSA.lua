@@ -21,12 +21,14 @@
 --[[ AddOn Namespace ]]--
 local addOnName, R14LosSA = ...
 --[[ Included stdlib identifiers. ]]--
-local string, pairs, _tostring, setmetatable, insert =
-    string, pairs, tostring, setmetatable, table.insert
+local string, pairs, _tostring, setmetatable, insert, band =
+    string, pairs, tostring, setmetatable, table.insert, bit.band
 local lower, gmatch = string.lower, string.gmatch
 --[[ Included WoW API identifiers. ]]--
-local PlaySoundFile, CreateFrame, CombatLogGetCurrentEventInfo =
-    PlaySoundFile, CreateFrame, CombatLogGetCurrentEventInfo
+local PlaySoundFile, CreateFrame, CombatLogGetCurrentEventInfo,
+    COMBATLOG_OBJECT_CONTROL_MASK, COMBATLOG_OBJECT_CONTROL_NPC =
+    PlaySoundFile, CreateFrame, CombatLogGetCurrentEventInfo,
+    COMBATLOG_OBJECT_CONTROL_MASK, COMBATLOG_OBJECT_CONTROL_NPC
 --[[ Included package identifiers. ]]--
 setfenv(1, R14LosSA)
 local _G, Spells, Version, Preferences, trim, print = _G, Spells, Version, Preferences, trim, print
@@ -151,6 +153,11 @@ local function load()
     sound_enable()
 end
 
+-- TODO: Find a better place for this -- Possibly a UnitFlags module.
+local function unit_is_npc(unit_flags)
+    return band(unit_flags, COMBATLOG_OBJECT_CONTROL_MASK) == COMBATLOG_OBJECT_CONTROL_NPC
+end
+
 --[[
 -- Script called when any in-game event occurs.
 ]]--
@@ -163,7 +170,8 @@ frame:SetScript("OnEvent", function(userdata, event, ...)
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
         local _, sub_event, _, _, _, source_flags, _, _, _, target_flags,
             _, _, spell_name = CombatLogGetCurrentEventInfo()
+        -- TODO: Band-aid fix. Find a better place for it. Reject any event involving NPCs.
+        if unit_is_npc(source_flags) or unit_is_npc(target_flags) then return end
         query(sub_event, spell_name, source_flags, target_flags)
     end
-    -- TODO: Enable or disable feature while inside of Battlegrounds.
 end)
