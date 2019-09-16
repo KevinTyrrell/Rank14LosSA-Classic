@@ -266,6 +266,7 @@ spell_builder
 	.source(FLAG_H_PLR).build("Silence", AURA_APP)
 	.source(FLAG_H_PLR).build("Sprint", AURA_APP)
 	.source(FLAG_H_PLR).build("Stealth", CAST_SCS)
+    .source(FLAG_H_PLR).spell("Prowl").sound("Stealth").build("Prowl", CAST_SCS) -- untested
 	.source(FLAG_H_PLR).build("Stoneform", AURA_APP)
 	.source(FLAG_H_PLR).target(FLAG_F_PTY)
 		.spell("Concussion Blow").sound("Stunned Friend").build("Concussion Blow2", AURA_APP)
