@@ -156,6 +156,7 @@ local FLAG_H_PLR = bor(CL_OTPLR, CL_OCP, CL_ORH, CL_OAO)
 local FLAG_F_PTY = bor(CL_OTPLR, CL_OCP, CL_ORF, CL_OAP)
 
 -- TODO: Big Heal, Shadowmeld -> Stealth, Spell Locked, Counterspelled, Kicked
+-- TODO: Warriors who are entering the player's view distance seems to 'automatically' cast a stance.
 
 spell_builder
     .source(FLAG_H_PLR).build("Adrenaline Rush", AURA_APP)
