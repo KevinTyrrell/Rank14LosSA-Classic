@@ -149,7 +149,6 @@ end
 local function load()
     -- No need to view this event anymore.
     frame:UnregisterEvent(PLAYER_ENTERING_WORLD)
-    print_splash()
     sound_enable()
 end
 

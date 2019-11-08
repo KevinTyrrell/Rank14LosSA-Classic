@@ -73,6 +73,7 @@ local alert_prefs = (function()
         saved.VERSION_TABLE = Version.TABLE
         return ver
     else
+        -- Create a fresh new preference table.
         local prefs = create_preferences()
         _G.RSA_Preferences = { Alerts = prefs, VERSION_TABLE = Version.TABLE }
         return prefs

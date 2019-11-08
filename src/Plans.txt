@@ -1,0 +1,61 @@
+
+#### NEW STRATEGY
+
+GLOBAL
+    private(public_table, key)
+        Key MUST be the private class table.
+        First param may be the public class or public instance table.
+        Throws an IllegalAccessException if the key is wrong.
+        Returns the same instance, but different table of public_table
+            This table is empty and has the highest access.
+            Calling this can access private, public, or protected members.            
+    protected(public_table, key)
+        Key MUST be the private class table.
+CLASS
+    Takes in reference to the superclass table
+    Returns public_class, public, private, and protected static tables
+
+CONSTRUCTOR
+    Default constructor is placed into the private table.
+    Returns public_instance, public, private, and protected tables
+
+EXCEPTION
+    IllegalAccessException
+        Used for Class when a user uses the invalid key.
+
+#### OLD STRATEGY
+
+Class Module
+returns Class Table, protected members, public members
+parameter subclass Class Table
+
+*create table for public members
+*create table for protected members
+static maps Class Tables to their protected members
+static maps Instance tables to their current default table
+
+class should query the superclasses protected table
+__index of protected table redirects to superclass protected table
+if __index for the protected tables returns nil,
+    redirects search to the default table.
+    
+class should define a default member table
+hierarchy, default table member should be initialized:
+    saves reference to previous hierarchy name
+    returns "classname[" .. hierarchy() .. "]"
+__index of the default member table redirects to the public table
+
+TODO: At the moment, all class members are static. This is a little strange?
+
+class should query the superclasses public table
+__index of public table redirects to the superclasses public table
+__index of the public table for the apex class throws an exception
+__index of the public table for non-apex classes direct to the superclass
+
+constructor:
+    * checks to make sure that the instance is an instance of the superclass
+    * __tostring redirects to the self["__tostring"]
+    * __call redirects to the self["__call"]
+    * __index redirects to static map[instance] ==> default table
+    * __newindex leads to an exception
+    
