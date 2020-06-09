@@ -31,12 +31,14 @@ local PlaySoundFile, CreateFrame, CombatLogGetCurrentEventInfo,
     COMBATLOG_OBJECT_CONTROL_MASK, COMBATLOG_OBJECT_CONTROL_NPC
 --[[ Included package identifiers. ]]--
 setfenv(1, R14LosSA)
-local _G, Spells, Version, Preferences, trim, print = _G, Spells, Version, Preferences, trim, print
+local _G, Spells, Version, Preferences, trim, print, Localization = 
+	_G, Spells, Version, Preferences, trim, print, Localization
 local COLOR_RESET, COLOR_TITLE1, COLOR_TITLE2, COLOR_ENABLED, COLOR_DISABLED =
     COLOR_RESET, COLOR_TITLE1, COLOR_TITLE2, COLOR_ENABLED, COLOR_DISABLED
 local query, toggle_alert, print_preferences, VERSION =
     Spells.query, Preferences.toggle_alert, Preferences.print_preferences, Version.VERSION
 
+local spell_local_names = Localization.spell_local_names
 --[[ Cached API Strings. ]]--
 local PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD"
 local ADDON_LOADED = "ADDON_LOADED"
@@ -172,6 +174,8 @@ frame:SetScript("OnEvent", function(userdata, event, ...)
             _, _, spell_name = CombatLogGetCurrentEventInfo()
         -- TODO: Band-aid fix. Find a better place for it. Reject any event involving NPCs.
         if unit_is_npc(source_flags) or unit_is_npc(target_flags) then return end
+		
+		if spell_local_names[GetLocale()][spell_name] ~= nil then spell_name = spell_local_names[GetLocale()][spell_name] end
         query(sub_event, spell_name, source_flags, target_flags)
     end
 end)

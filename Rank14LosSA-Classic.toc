@@ -10,6 +10,8 @@
 src\Version.lua
 # Core global functions.
 src\Core.lua
+# Localization data
+src\Localization.lua
 # Spell database.
 src\Spells.lua
 # User's saved preferences.
